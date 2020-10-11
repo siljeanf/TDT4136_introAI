@@ -14,6 +14,12 @@ class CSP:
         # the variable pair (i, j)
         self.constraints = {}
 
+        #count nr of calls BACKTRACK is called
+        self.backtrack_call = 0
+
+        #count nr of BACKTRACK is failed
+        self.failure_call = 0
+
     def add_variable(self, name, domain):
         """Add a new variable to the CSP. 'name' is the variable name
         and 'domain' is a list of the legal values for the variable.
@@ -108,6 +114,10 @@ class CSP:
         assignments and inferences that took place in previous
         iterations of the loop.
         """
+
+        
+        self.backtrack_call += 1
+
         #finish test
         counter = 0 #keeps track of nr of unassigned variables
         for values in assignment.values():
@@ -120,8 +130,26 @@ class CSP:
         #get an unassigned variable
         var = self.select_unassigned_variable(assignment)
 
-        #iterate values for this variable
-        # for value in assignment[var]:
+        # iterate values for this variable without use of a heuristic for order domain
+        for value in assignment[var]:
+            # Make a copy of the assignment in case we want to go back 
+            assignment_copy = copy.deepcopy(assignment) 
+
+            # Propse a solution by setting a variable to the following value
+            if value in assignment_copy[var]:
+                assignment_copy[var] = [value]
+
+            #Run inference on proposed solution
+            if self.inference(assignment_copy, self.get_all_arcs()):
+                #run backtrack if inference does not fail
+                result = self.backtrack(assignment_copy) 
+                if result != None:
+                    return result
+
+        #if backtrack fails
+        self.failure_call +=1
+        return None
+
 
 
     def select_unassigned_variable(self, assignment):
@@ -132,11 +160,11 @@ class CSP:
         """
         #iterate through variables and value pairs in assignment dictionary
         for var,values in assignment.items():
-            if len(values) != 1: #more than one option left
+            #if more than one value option left for the variable, the variable is unassigned
+            if len(values) != 1: 
                 return var
-            else: 
-                return None
-
+             
+        return None
 
 
     def inference(self, assignment, queue):
@@ -145,10 +173,28 @@ class CSP:
         the lists of legal values for each undecided variable. 'queue'
         is the initial queue of arcs that should be visited.
         """
-        # TODO: IMPLEMENT THIS
-        pass
+        while queue:
+            #remove arc from queue
+            (var_i, var_j) = queue.pop(0) 
 
-    def revise(self, assignment, i, j):
+            if self.revise(assignment,var_i, var_j): #if we removed a value for variable i‘s domain
+                
+                #if var_i‘s domain is empty (=incosistent)
+                if not assignment[var_i]:
+                    return False
+
+                #get_all_neighbours are on the form [(var_new, var_i), ...]
+                for neighbour in self.get_all_neighboring_arcs(var_i): #iterate all neighbour arcs of i
+
+                    #in order to not append the tuple (var_i,var_j)
+                    if neighbour[0] != var_j:
+                        queue.append(neighbour) #append the new arc to queue
+        
+        #arc consistent if there are noe empty domains 
+        return True
+
+
+    def revise(self, assignment, var_i, var_j):
         """The function 'Revise' from the pseudocode in the textbook.
         'assignment' is the current partial assignment, that contains
         the lists of legal values for each undecided variable. 'i' and
@@ -158,33 +204,29 @@ class CSP:
         legal values in 'assignment'. 
 
         """
-        # TODO: IMPLEMENT THIS
-        #remove values from a domain for a variable
-        
-        revised = False
-        delete_values = []
-        constraint_is_satisfied = False
-        for value_i in assignment[i]:
-            for value_j in assignment[j]:
-                if (value_i, value_j) in self.constraints[i][j]: #check if valuepair exists in list of all constraints between the two variables
-                    constraint_is_satisfied = True
-            if not constraint_is_satisfied:
-                delete_values.append(value_i)
-                revised = True
-            
-        #delete values from i‘s list of legal values in assignment
-        for value in delete_values:
-            assignment[i].remove(value)
-            
-        return revised
+        #remove incosistent values from the domain of variable i
 
+        removed = False #initially no values are removed
+        constraint_is_satisfied = False #initially no constraints are satisified
+
+        #iterate through list of values for the two variables
+        for value_i in assignment[var_i]: 
+            for value_j in assignment[var_j]:
+
+                #check if valuepair exists in list of all constraints between the two variables
+                if (value_i, value_j) in self.constraints[var_i][var_j]: 
+                    constraint_is_satisfied = True 
+
+            #if no values satisify the constraints between var_i and var_j
+            if not constraint_is_satisfied: 
+
+                #delete value_i as it does not satisfy the constraints between var_i and var_j
+                assignment[var_i].remove(value_i)
+
+                removed = True #indicate that a value is deleted from i
+                      
             
-                    
-            # constraints = get_all_neighboring_arcs(i)
-            # for constraint in constraints:
-            #     if constraint[0] == j
-                
-     
+        return removed #true if values have been deleted from var_i
 
 #end of CSP class
 
@@ -242,43 +284,48 @@ def print_sudoku_solution(solution):
     """
     for row in range(9):
         for col in range(9):
-            print(solution['%d-%d' % (row, col)][0]),
+            print(solution['%d-%d' % (row, col)][0], ' ', end=''),
             if col == 2 or col == 5:
-                print('|'),
+                print('|', ' ', end=''),
         print("")
         if row == 2 or row == 5:
-            print('------+-------+------')
+            print('---------+-----------+---------')
 
 
 
 def main():
-    # test code on map
-    csp = create_map_coloring_csp()
 
-    # print("domains")
-    # print(csp.domains)
-    print("var")
-    print(csp.variables)
-    # print("constraints")
-    # print(csp.constraints)
-    # print(csp.get_all_arcs)
-    # print(csp.variables[0])
-    # print(csp.get_all_neighboring_arcs(csp.variables[0]))
-    # print(csp.get_all_possible_pairs(csp.variables[0], csp.variables[1]))
+    # MAP PROBLEM
+    # csp = create_map_coloring_csp()
+    # print('domains before:', csp.domains)
+    # finish = csp.backtracking_search()
+    # print('domains after:', finish)
 
-    # assignment = csp.domains
-    # for state,color in assignment.items():
-    #     print(color)
-    #     if len(color) != 1:
-    #         print(state)
-    tester1 = csp.variables[0]
-    print(tester1)
-    tester2 = csp.variables[1]
-    print(tester2)
-    c = csp.constraints[tester1][tester2]
-    print(c)
+    #SUDOKU PROBLEMS
+    
+    #THIS PATHMAKER FUNCTION IS ONLY USABLE FOR MY DIRECTORIES
+    #to merge path and filename (here I have used the path for each file)
+    def pathmaker(filename):
+        path = '/Users/siljemarieanfindsen/Documents/introAI/ex4/code_handout/'
+        return path + filename
+    
+    easy = 'easy.txt'
+    medium = 'medium.txt'
+    hard = 'hard.txt'
+    veryhard = 'veryhard.txt'
 
+    #choose board
+    def sudoku_solver(board):
+        csp = create_sudoku_csp(pathmaker(board))          
+        print("______________Solution to", board, "______________")
+        solution = csp.backtracking_search()
+        print_sudoku_solution(solution)
+        print("\nNumber of backtracks:", csp.backtrack_call)
+        print( "\nNumber of failures:", csp.failure_call)
 
+    #easy board
+    sudoku_solver(easy)
+    
 
 if __name__ == "__main__":
     main()
